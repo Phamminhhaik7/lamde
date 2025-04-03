@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bài kiểm tra</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <h1>Bài kiểm tra</h1>
+            
+            <div class="subject-selection">
+                <label>Chọn môn học:</label>
+                <select id="subject-select">
+                    <option value="physics">Vật lý</option>
+                    <option value="chemistry">Hóa học</option>
+                    <option value="math">Toán</option>
+                </select>
+            </div>
+
+            <div id="countdown">Thời gian còn lại: <span id="time">50:00</span></div>
+            
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress" class="progress"></div>
+                </div>
+                <div id="progress-text">0/26 câu đã trả lời</div>
+            </div>
+
+            <div id="questions"></div>
+
+            <div id="file-upload">
+                <label for="answer-file"><i class="fas fa-upload"></i> Tải lên file JSON đáp án:</label>
+                <input type="file" id="answer-file" accept=".json">
+            </div>
+
+            <button id="submit"><i class="fas fa-check"></i> Hoàn thành</button>
+            <div id="result"></div>
+        </div>
+
+        <div class="sidebar">
+            <h3>Danh sách câu hỏi</h3>
+            <div class="question-nav" id="question-nav"></div>
+            <div class="navigation-buttons">
+                <button id="prev-btn" disabled><i class="fas fa-arrow-left"></i> Câu trước</button>
+                <button id="next-btn">Câu tiếp <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
