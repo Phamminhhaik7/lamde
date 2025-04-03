@@ -1,0 +1,49 @@
+{
+    "subjects": {
+        "math": {
+            "name": "Toán",
+            "categories": {
+                "moon": {
+                    "name": "Moon",
+                    "description": "Đề thi từ Moon",
+                    "exams": []
+                },
+                "other": {
+                    "name": "Khác",
+                    "description": "Các đề thi khác",
+                    "exams": []
+                }
+            }
+        },
+        "physics": {
+            "name": "Vật lý",
+            "categories": {
+                "moon": {
+                    "name": "Moon",
+                    "description": "Đề thi từ Moon",
+                    "exams": []
+                },
+                "other": {
+                    "name": "Khác",
+                    "description": "Các đề thi khác",
+                    "exams": []
+                }
+            }
+        },
+        "chemistry": {
+            "name": "Hóa học",
+            "categories": {
+                "moon": {
+                    "name": "Moon",
+                    "description": "Đề thi từ Moon",
+                    "exams": []
+                },
+                "other": {
+                    "name": "Khác",
+                    "description": "Các đề thi khác",
+                    "exams": []
+                }
+            }
+        }
+    }
+} 
