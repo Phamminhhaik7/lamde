@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý đề thi</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Quản lý đề thi</h1>
+
+        <!-- Form thêm mục mới -->
+        <div class="form-section">
+            <h2>Thêm mục mới</h2>
+            <form id="add-category-form">
+                <div class="form-group">
+                    <label for="subject">Môn học:</label>
+                    <select name="subject" id="subject" required>
+                        <option value="">Chọn môn học</option>
+                        <option value="math">Toán</option>
+                        <option value="physics">Vật lý</option>
+                        <option value="chemistry">Hóa học</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category-name">Tên mục:</label>
+                    <input type="text" name="category-name" id="category-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="category-description">Mô tả:</label>
+                    <textarea name="category-description" id="category-description"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Thêm mục</button>
+            </form>
+        </div>
+
+        <!-- Form thêm đề mới -->
+        <div class="form-section">
+            <h2>Thêm đề mới</h2>
+            <form id="add-exam-form">
+                <div class="form-group">
+                    <label for="exam-subject">Môn học:</label>
+                    <select name="subject" id="exam-subject" required>
+                        <option value="">Chọn môn học</option>
+                        <option value="math">Toán</option>
+                        <option value="physics">Vật lý</option>
+                        <option value="chemistry">Hóa học</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category">Mục:</label>
+                    <select name="category" id="category" required>
+                        <option value="">Chọn mục</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="exam-name">Tên đề:</label>
+                    <input type="text" name="exam-name" id="exam-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="answer-file">File đáp án:</label>
+                    <input type="file" name="answer-file" id="answer-file" accept=".json" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Thêm đề</button>
+            </form>
+        </div>
+
+        <!-- Danh sách đề thi -->
+        <div class="form-section">
+            <h2>Danh sách đề thi</h2>
+            <div id="exam-list">
+                <!-- Danh sách sẽ được thêm vào đây bằng JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html> 
