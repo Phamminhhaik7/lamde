@@ -1,436 +1,659 @@
-let questions = [];
-let answers = {};
-let timeLeft = 50 * 60; // Mặc định 50 phút
-let currentQuestion = 0;
-let answeredQuestions = new Set();
-let currentSubject = 'physics'; // Mặc định là môn Vật lý
+// Biến toàn cục
+let timeLeft = 90 * 60; // 90 phút (mặc định cho toán)
+let answers = {}; // Lưu đáp án của người dùng
+let correctAnswers = {}; // Lưu đáp án đúng từ file JSON
+let currentQuestion = 1; // Câu hỏi hiện tại
+let totalQuestions = 0; // Tổng số câu hỏi
+let subject = 'math'; // Môn học mặc định
+let score = {
+    multipleChoice: 0,
+    trueFalse: 0,
+    shortAnswer: 0,
+    total: 0
+}; // Điểm số
+let maxScore = {
+    multipleChoice: 0,
+    trueFalse: 0,
+    shortAnswer: 0,
+    total: 0
+}; // Điểm tối đa
+let correctCount = 0; // Số câu đúng
+let incorrectCount = 0; // Số câu sai
+let unansweredCount = 0; // Số câu chưa trả lời
+let timerInterval; // Biến lưu interval của đồng hồ đếm ngược
+let resultModal; // Biến lưu modal kết quả
 
-const subjectConfig = {
-    physics: {
-        multipleChoice: 16,
-        trueFalse: 4,
-        shortAnswer: 6,
-        shortAnswerScore: 0.25,
-        time: 50 // 50 phút
-    },
-    chemistry: {
-        multipleChoice: 16,
-        trueFalse: 4,
-        shortAnswer: 6,
-        shortAnswerScore: 0.25,
-        time: 50 // 50 phút
-    },
-    math: {
-        multipleChoice: 12,
-        trueFalse: 4,
-        shortAnswer: 6,
-        shortAnswerScore: 0.5,
-        time: 90 // 90 phút
-    }
+// Khởi tạo ứng dụng
+window.onload = () => {
+    // Khởi tạo modal kết quả
+    resultModal = new bootstrap.Modal(document.getElementById('result-modal'));
+
+    // Thêm sự kiện cho nút tải đáp án mẫu
+    document.getElementById('loadDefaultAnswers').addEventListener('click', loadDefaultAnswers);
+
+    // Thêm sự kiện cho nút chọn môn học
+    document.getElementById('subject').addEventListener('change', loadQuestions);
+
+    // Tải câu hỏi và bắt đầu đồng hồ
+    loadQuestions();
+    startTimer();
+    goToQuestion(1);
+
+    // Thêm sự kiện cho input file
+    document.getElementById('jsonFile').addEventListener('change', handleFileUpload);
+    
+    // Thêm sự kiện cho input text area
+    document.getElementById('jsonText').addEventListener('input', handleTextChange);
 };
 
-function getQuestionLabel(index, type) {
-    const config = subjectConfig[currentSubject];
-    if (type === 'multiple-choice') {
-        return `Câu ${index + 1}`;
-    } else if (type === 'true-false-multi') {
-        return `Câu ${index - config.multipleChoice + 1}`;
-    } else {
-        return `Câu ${index - (config.multipleChoice + config.trueFalse) + 1}`;
-    }
-}
+// Đếm ngược thời gian
+function startTimer() {
+    const timerElement = document.getElementById('timer');
 
-function getQuestionSection(type) {
-    switch(type) {
-        case 'multiple-choice':
-            return 'PHẦN I: TRẮC NGHIỆM';
-        case 'true-false-multi':
-            return 'PHẦN II: ĐÚNG/SAI';
-        case 'short-answer':
-            return 'PHẦN III: TRẢ LỜI NGẮN';
-        default:
-            return '';
-    }
-}
-
-function createQuestions() {
-    const config = subjectConfig[currentSubject];
-    questions = [];
-
-    // Câu hỏi trắc nghiệm
-    for (let i = 1; i <= config.multipleChoice; i++) {
-        questions.push({
-            question: `Câu hỏi trắc nghiệm ${i}?`,
-            type: 'multiple-choice',
-            options: ['Đáp án A', 'Đáp án B', 'Đáp án C', 'Đáp án D'],
-            answer: 'C' // Mặc định
-        });
+    // Xóa interval cũ nếu có
+    if (timerInterval) {
+        clearInterval(timerInterval);
     }
 
-    // Câu hỏi đúng/sai
-    for (let i = 1; i <= config.trueFalse; i++) {
-        questions.push({
-            question: `Câu hỏi đúng/sai ${i}?`,
-            type: 'true-false-multi',
-            parts: ['a', 'b', 'c', 'd'],
-            answer: {a: 'Đúng', b: 'Sai', c: 'Đúng', d: 'Sai'} // Mặc định
-        });
-    }
-
-    // Câu hỏi trả lời ngắn
-    for (let i = 1; i <= config.shortAnswer; i++) {
-        questions.push({
-            question: `Câu hỏi trả lời ngắn ${i}?`,
-            type: 'short-answer',
-            answer: 'Đáp án ngắn' // Mặc định
-        });
-    }
-}
-
-function renderQuestions() {
-    const questionsDiv = document.getElementById('questions');
-    const questionNav = document.getElementById('question-nav');
-    questionsDiv.innerHTML = '';
-    questionNav.innerHTML = '';
-    
-    let currentSection = '';
-    
-    questions.forEach((question, index) => {
-        // Add section header if section changes
-        const section = getQuestionSection(question.type);
-        if (section !== currentSection) {
-            questionsDiv.innerHTML += `<h2 class="section-header">${section}</h2>`;
-            currentSection = section;
+    timerInterval = setInterval(() => {
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            submitAnswers();
+            return;
         }
 
-        // Render main question content
-        let questionHtml = `<div class="question ${index === 0 ? 'active' : ''}" data-index="${index}">
-            <h3>${getQuestionLabel(index, question.type)}: ${question.question}</h3>`;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
-        if (question.type === 'multiple-choice') {
-            questionHtml += '<div class="options">';
-            question.options.forEach((option, optionIndex) => {
-                const value = String.fromCharCode(65 + optionIndex);
-                questionHtml += `<label><input type="radio" name="question${index + 1}" value="${value}"> ${option}</label>`;
-            });
-            questionHtml += '</div>';
-        } else if (question.type === 'true-false-multi') {
-            questionHtml += '<div class="options">';
-            question.parts.forEach(part => {
-                questionHtml += `<label>${part}: <input type="radio" name="question${index + 1}${part}" value="Đúng"> Đúng</label>`;
-                questionHtml += `<label><input type="radio" name="question${index + 1}${part}" value="Sai"> Sai</label>`;
-            });
-            questionHtml += '</div>';
-        } else if (question.type === 'short-answer') {
-            questionHtml += `<input type="text" name="question${index + 1}">`;
+        // Đổi màu khi còn ít thời gian
+        if (timeLeft < 300) { // 5 phút
+            timerElement.classList.add('text-danger');
+            timerElement.classList.add('blink');
         }
 
-        questionHtml += '</div>';
-        questionsDiv.innerHTML += questionHtml;
-
-        // Render navigation button with section indicator
-        const navButton = document.createElement('button');
-        navButton.textContent = getQuestionLabel(index, question.type).replace('Câu ', '');
-        if (index === 0 || 
-            index === subjectConfig[currentSubject].multipleChoice || 
-            index === subjectConfig[currentSubject].multipleChoice + subjectConfig[currentSubject].trueFalse) {
-            navButton.classList.add('section-start');
-        }
-        navButton.setAttribute('data-index', index);
-        navButton.addEventListener('click', () => goToQuestion(index));
-        questionNav.appendChild(navButton);
-    });
-
-    // Load saved answers and update navigation
-    loadSavedAnswers();
-    updateProgress();
-    updateQuestionNav();
+        timeLeft--;
+    }, 1000);
 }
 
-function updateProgress() {
-    const progress = document.getElementById('progress');
-    const progressText = document.getElementById('progress-text');
-    const percentage = (answeredQuestions.size / questions.length) * 100;
-    progress.style.width = `${percentage}%`;
-    progressText.textContent = `${answeredQuestions.size}/${questions.length} câu đã trả lời`;
-}
-
-function saveAnswer() {
-    const question = questions[currentQuestion];
-    const questionNumber = currentQuestion + 1;
-    let answer = null;
-
-    if (question.type === 'multiple-choice') {
-        const selected = document.querySelector(`input[name="question${questionNumber}"]:checked`);
-        if (selected) {
-            answer = selected.value;
-            answeredQuestions.add(currentQuestion);
-        }
-    } else if (question.type === 'true-false-multi') {
-        answer = {};
-        let hasAnswer = true;
-        question.parts.forEach(part => {
-            const selected = document.querySelector(`input[name="question${questionNumber}${part}"]:checked`);
-            if (selected) {
-                answer[part] = selected.value;
-            } else {
-                hasAnswer = false;
+// Tải đáp án mẫu
+function loadDefaultAnswers() {
+    // Sử dụng đáp án mẫu từ file answer.json
+    fetch('answer.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Không thể tải file đáp án mẫu');
             }
+            return response.json();
+        })
+        .then(data => {
+            correctAnswers = data;
+            document.getElementById('fileStatus').textContent = 'Đã tải đáp án mẫu';
+            document.getElementById('fileStatus').className = 'form-text text-success';
+        })
+        .catch(error => {
+            console.error('Lỗi:', error);
+            document.getElementById('fileStatus').textContent = 'Lỗi khi tải đáp án mẫu: ' + error.message;
+            document.getElementById('fileStatus').className = 'form-text text-danger';
         });
-        if (hasAnswer) {
-            answeredQuestions.add(currentQuestion);
-        }
-    } else if (question.type === 'short-answer') {
-        const input = document.querySelector(`input[name="question${questionNumber}"]`);
-        if (input.value.trim()) {
-            answer = input.value;
-            answeredQuestions.add(currentQuestion);
-        }
-    }
-
-    if (answer) {
-        localStorage.setItem(`answer_${questionNumber}`, JSON.stringify(answer));
-        updateProgress();
-        updateQuestionNav();
-    }
 }
 
-function loadSavedAnswers() {
-    questions.forEach((_, index) => {
-        const questionNumber = index + 1;
-        const savedAnswer = localStorage.getItem(`answer_${questionNumber}`);
-        if (savedAnswer) {
-            const answer = JSON.parse(savedAnswer);
-            const question = questions[index];
-            
-            if (question.type === 'multiple-choice') {
-                const radio = document.querySelector(`input[name="question${questionNumber}"][value="${answer}"]`);
-                if (radio) radio.checked = true;
-            } else if (question.type === 'true-false-multi') {
-                Object.entries(answer).forEach(([part, value]) => {
-                    const radio = document.querySelector(`input[name="question${questionNumber}${part}"][value="${value}"]`);
-                    if (radio) radio.checked = true;
-                });
-            } else if (question.type === 'short-answer') {
-                const input = document.querySelector(`input[name="question${questionNumber}"]`);
-                if (input) input.value = answer;
-            }
-            
-            answeredQuestions.add(index);
-        }
-    });
-}
-
-function updateQuestionNav() {
-    const buttons = document.querySelectorAll('.question-nav button');
-    buttons.forEach((button, index) => {
-        button.classList.remove('current', 'answered');
-        if (index === currentQuestion) {
-            button.classList.add('current');
-        }
-        if (answeredQuestions.has(index)) {
-            button.classList.add('answered');
-        }
-    });
-}
-
-function goToQuestion(index) {
-    saveAnswer();
-    const questions = document.querySelectorAll('.question');
-    questions[currentQuestion].classList.remove('active');
-    currentQuestion = index;
-    questions[currentQuestion].classList.add('active');
-    updateQuestionNav();
-    
-    // Update navigation buttons
-    document.getElementById('prev-btn').disabled = currentQuestion === 0;
-    document.getElementById('next-btn').disabled = currentQuestion === questions.length - 1;
-}
-
-function navigateQuestion(direction) {
-    saveAnswer();
-    const questions = document.querySelectorAll('.question');
-    questions[currentQuestion].classList.remove('active');
-    
-    if (direction === 'next') {
-        currentQuestion = Math.min(currentQuestion + 1, questions.length - 1);
-    } else {
-        currentQuestion = Math.max(currentQuestion - 1, 0);
-    }
-    
-    questions[currentQuestion].classList.add('active');
-    updateQuestionNav();
-    
-    // Update navigation buttons
-    document.getElementById('prev-btn').disabled = currentQuestion === 0;
-    document.getElementById('next-btn').disabled = currentQuestion === questions.length - 1;
-}
-
-document.getElementById('prev-btn').addEventListener('click', () => navigateQuestion('prev'));
-document.getElementById('next-btn').addEventListener('click', () => navigateQuestion('next'));
-
-// Update submit function to show confirmation
-document.getElementById('submit').addEventListener('click', () => {
-    if (confirm('Bạn có chắc chắn muốn nộp bài? Bạn sẽ không thể thay đổi câu trả lời sau khi nộp.')) {
-        submitTest();
-    }
-});
-
-document.getElementById('answer-file').addEventListener('change', handleAnswerFile);
-
-function handleAnswerFile(event) {
+// Xử lý tải file JSON
+function handleFileUpload(event) {
     const file = event.target.files[0];
-    const reader = new FileReader();
+    if (!file) return;
 
-    reader.onload = function (event) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
         try {
-            answers = JSON.parse(event.target.result);
+            correctAnswers = JSON.parse(e.target.result);
+            document.getElementById('fileStatus').textContent = 'Đã tải file đáp án thành công';
+            document.getElementById('fileStatus').className = 'form-text text-success';
+            document.getElementById('jsonText').value = "";
         } catch (error) {
-            console.error('Lỗi khi phân tích cú pháp file JSON đáp án:', error);
-            alert('File JSON đáp án không hợp lệ. Vui lòng kiểm tra lại.');
+            console.error('Lỗi khi phân tích file JSON:', error);
+            document.getElementById('fileStatus').textContent = 'Lỗi: File JSON không hợp lệ';
+            document.getElementById('fileStatus').className = 'form-text text-danger';
         }
+    };
+
+    reader.onerror = () => {
+        document.getElementById('fileStatus').textContent = 'Lỗi khi đọc file';
+        document.getElementById('fileStatus').className = 'form-text text-danger';
     };
 
     reader.readAsText(file);
 }
 
-function submitTest() {
-    let score = 0;
-    const results = [];
-    const config = subjectConfig[currentSubject];
-
-    questions.forEach((question, index) => {
-        const questionNumber = index + 1;
-        let userAnswer;
-        let correctAnswer = answers[questionNumber.toString()];
-        let isCorrect = false;
-        let points = 0;
-
-        if (question.type === 'multiple-choice') {
-            userAnswer = document.querySelector(`input[name="question${questionNumber}"]:checked`)?.value;
-            isCorrect = userAnswer === correctAnswer;
-            points = isCorrect ? (10 / config.multipleChoice) : 0;
-            score += points;
-        } else if (question.type === 'true-false-multi') {
-            userAnswer = {};
-            let correctParts = 0;
-            question.parts.forEach(part => {
-                userAnswer[part] = document.querySelector(`input[name="question${questionNumber}${part}"]:checked`)?.value;
-                if (userAnswer[part] === correctAnswer[part]) {
-                    correctParts++;
-                }
-            });
-            points = (correctParts / 4) * (10 / config.trueFalse);
-            score += points;
-            isCorrect = correctParts === 4;
-        } else if (question.type === 'short-answer') {
-            userAnswer = document.querySelector(`input[name="question${questionNumber}"]`).value;
-            isCorrect = userAnswer === correctAnswer;
-            points = isCorrect ? config.shortAnswerScore : 0;
-            score += points;
-        }
-
-        results.push({
-            question: question.question,
-            userAnswer: userAnswer,
-            correctAnswer: correctAnswer,
-            isCorrect: isCorrect,
-            points: points.toFixed(2)
-        });
-    });
-
-    displayResults(score, results);
+// Xử lý thay đổi trong text area
+function handleTextChange(event) {
+    const text = event.target.value;
+    if (!text) return;
+    try {
+        correctAnswers = JSON.parse(text);
+        document.getElementById('fileStatus').textContent = 'Đã tải đáp án từ text thành công';
+        document.getElementById('fileStatus').className = 'form-text text-success';
+        document.getElementById('jsonFile').value = "";
+    } catch (error) {
+        console.error('Lỗi khi phân tích JSON từ text:', error);
+        document.getElementById('fileStatus').textContent = 'Lỗi: JSON từ text không hợp lệ';
+        document.getElementById('fileStatus').className = 'form-text text-danger';
+    }
 }
 
-function displayResults(score, results) {
-    const resultDiv = document.getElementById('result');
-    
-    resultDiv.innerHTML = `
-        <div class="result-summary">
-            <h2>Kết quả bài kiểm tra ${currentSubject === 'physics' ? 'Vật lý' : 
-                                     currentSubject === 'chemistry' ? 'Hóa học' : 'Toán'}</h2>
-            <div class="score">
-                ${score.toFixed(2)}/10 điểm (${(score * 10).toFixed(1)}%)
-            </div>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Câu hỏi</th>
-                    <th>Điểm</th>
-                    <th>Kết quả</th>
-                </tr>
-            </thead>
-            <tbody>`;
+// Tạo câu hỏi động dựa trên môn học
+function loadQuestions() {
+    subject = document.getElementById('subject').value;
+    const multipleChoiceDiv = document.getElementById('multiple-choice');
+    const trueFalseDiv = document.getElementById('true-false');
+    const shortAnswerDiv = document.getElementById('short-answer');
+    const questionNav = document.getElementById('question-nav');
 
-    results.forEach((result, index) => {
-        resultDiv.innerHTML += `
-            <tr>
-                <td>
-                    <strong>Câu ${index + 1}:</strong> ${result.question}
-                    <div class="answer-comparison">
-                        <div class="answer-box">
-                            <strong>Câu trả lời của bạn:</strong><br>
-                            ${formatAnswer(result.userAnswer)}
+    // Xóa nội dung cũ
+    multipleChoiceDiv.innerHTML = '';
+    trueFalseDiv.innerHTML = '';
+    shortAnswerDiv.innerHTML = '';
+    questionNav.innerHTML = '';
+
+    // Số câu hỏi tùy theo môn học
+    let multipleChoiceCount, shortAnswerCount;
+    if (subject === 'math') {
+        multipleChoiceCount = 12;
+        shortAnswerCount = 6;
+        timeLeft = 90 * 60; // 90 phút cho toán
+    } else if (subject === 'physics' || subject === 'chemistry') {
+        multipleChoiceCount = 18;
+        shortAnswerCount = 6;
+        timeLeft = 50 * 60; // 50 phút cho lý và hóa
+    } else {
+        multipleChoiceCount = 12;
+        shortAnswerCount = 6;
+        timeLeft = 90 * 60; // 90 phút cho toán (mặc định)
+    }
+    const trueFalseCount = 4; // Luôn có 4 câu đúng/sai
+    totalQuestions = multipleChoiceCount + trueFalseCount + shortAnswerCount;
+
+    // Tính điểm tối đa
+    maxScore.multipleChoice = multipleChoiceCount * 0.25;
+    maxScore.trueFalse = trueFalseCount * 1; // Mỗi câu đúng/sai tối đa 1 điểm
+    maxScore.shortAnswer = subject === 'math' ? shortAnswerCount * 0.5 : shortAnswerCount * 0.25;
+    maxScore.total = maxScore.multipleChoice + maxScore.trueFalse + maxScore.shortAnswer;
+
+    // Tạo câu trắc nghiệm
+    for (let i = 1; i <= multipleChoiceCount; i++) {
+        multipleChoiceDiv.innerHTML += `
+            <div class="mb-4 question" id="q${i}">
+                <p class="fw-bold fs-5">Câu ${i}: Câu hỏi trắc nghiệm ${i}?</p>
+                <div class="form-check form-check-lg">
+                    <input class="form-check-input" type="radio" name="q${i}" id="q${i}A" value="A" onchange="saveAnswer(${i}, 'A')">
+                    <label class="form-check-label fs-5" for="q${i}A">Đáp án A</label>
+                </div>
+                <div class="form-check form-check-lg">
+                    <input class="form-check-input" type="radio" name="q${i}" id="q${i}B" value="B" onchange="saveAnswer(${i}, 'B')">
+                    <label class="form-check-label fs-5" for="q${i}B">Đáp án B</label>
+                </div>
+                <div class="form-check form-check-lg">
+                    <input class="form-check-input" type="radio" name="q${i}" id="q${i}C" value="C" onchange="saveAnswer(${i}, 'C')">
+                    <label class="form-check-label fs-5" for="q${i}C">Đáp án C</label>
+                </div>
+                <div class="form-check form-check-lg">
+                    <input class="form-check-input" type="radio" name="q${i}" id="q${i}D" value="D" onchange="saveAnswer(${i}, 'D')">
+                    <label class="form-check-label fs-5" for="q${i}D">Đáp án D</label>
+                </div>
+                <div id="result-q${i}" class="result mt-2"></div>
+            </div>
+        `;
+        questionNav.innerHTML += `<button class="btn btn-outline-primary" id="nav-q${i}" onclick="goToQuestion(${i})">${i}</button>`;
+    }
+
+    // Tạo câu đúng/sai với checkbox
+    for (let i = multipleChoiceCount + 1; i <= multipleChoiceCount + trueFalseCount; i++) {
+        trueFalseDiv.innerHTML += `
+            <div class="mb-4 question" id="q${i}">
+                <p class="fw-bold fs-5">Câu ${i}: Câu hỏi đúng/sai ${i - multipleChoiceCount}?</p>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <p class="mb-1 fs-5">a:</p>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}a-true" onchange="saveTrueFalseAnswer(${i}, 'a', 'Đúng', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}a-true">Đúng</label>
                         </div>
-                        <div class="answer-box">
-                            <strong>Đáp án đúng:</strong><br>
-                            ${formatAnswer(result.correctAnswer)}
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}a-false" onchange="saveTrueFalseAnswer(${i}, 'a', 'Sai', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}a-false">Sai</label>
                         </div>
                     </div>
-                </td>
-                <td>${result.points}</td>
-                <td>
-                    <span class="${result.isCorrect ? 'result-correct' : 'result-incorrect'}">
-                        ${result.isCorrect ? 'Đúng' : 'Sai'}
-                    </span>
-                </td>
-            </tr>
+                    <div class="checkbox-item">
+                        <p class="mb-1 fs-5">b:</p>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}b-true" onchange="saveTrueFalseAnswer(${i}, 'b', 'Đúng', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}b-true">Đúng</label>
+                        </div>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}b-false" onchange="saveTrueFalseAnswer(${i}, 'b', 'Sai', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}b-false">Sai</label>
+                        </div>
+                    </div>
+                    <div class="checkbox-item">
+                        <p class="mb-1 fs-5">c:</p>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}c-true" onchange="saveTrueFalseAnswer(${i}, 'c', 'Đúng', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}c-true">Đúng</label>
+                        </div>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}c-false" onchange="saveTrueFalseAnswer(${i}, 'c', 'Sai', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}c-false">Sai</label>
+                        </div>
+                    </div>
+                    <div class="checkbox-item">
+                        <p class="mb-1 fs-5">d:</p>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}d-true" onchange="saveTrueFalseAnswer(${i}, 'd', 'Đúng', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}d-true">Đúng</label>
+                        </div>
+                        <div class="form-check form-check-lg">
+                            <input class="form-check-input" type="checkbox" id="q${i}d-false" onchange="saveTrueFalseAnswer(${i}, 'd', 'Sai', this.checked)">
+                            <label class="form-check-label fs-5" for="q${i}d-false">Sai</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="result-q${i}" class="result mt-2"></div>
+            </div>
         `;
+        questionNav.innerHTML += `<button class="btn btn-outline-primary" id="nav-q${i}" onclick="goToQuestion(${i})">${i}</button>`;
+    }
+
+    // Tạo câu trả lời ngắn
+    for (let i = multipleChoiceCount + trueFalseCount + 1; i <= totalQuestions; i++) {
+        shortAnswerDiv.innerHTML += `
+            <div class="mb-4 question" id="q${i}">
+                <label for="answer-q${i}" class="form-label fw-bold fs-5">Câu ${i}: Câu hỏi trả lời ngắn ${i - multipleChoiceCount - trueFalseCount}?</label>
+                <input type="text" class="form-control form-control-lg" id="answer-q${i}" oninput="saveAnswer(${i}, this.value)">
+                <div id="result-q${i}" class="result mt-2"></div>
+            </div>
+        `;
+        questionNav.innerHTML += `<button class="btn btn-outline-primary" id="nav-q${i}" onclick="goToQuestion(${i})">${i}</button>`;
+    }
+
+    // Reset thống kê và đáp án
+    answers = {};
+    score = {
+        multipleChoice: 0,
+        trueFalse: 0,
+        shortAnswer: 0,
+        total: 0
+    };
+    correctCount = 0;
+    incorrectCount = 0;
+    unansweredCount = 0;
+
+    // Hiển thị câu hỏi đầu tiên
+    goToQuestion(1);
+
+    // Cập nhật thanh tiến trình
+    updateProgressBar();
+    
+    // Bắt đầu lại đồng hồ
+    startTimer();
+}
+
+// Lưu đáp án của người dùng
+function saveAnswer(question, option) {
+    answers[question] = option;
+
+    // Đánh dấu câu hỏi đã trả lời
+    const navButton = document.getElementById(`nav-q${question}`);
+    if (navButton) {
+        navButton.classList.add('answered');
+    }
+
+    // Cập nhật thanh tiến trình
+    updateProgressBar();
+}
+
+// Lưu đáp án đúng/sai
+function saveTrueFalseAnswer(question, option, value, checked) {
+    // Nếu chọn một giá trị, bỏ chọn giá trị còn lại
+    if (checked) {
+        if (value === 'Đúng') {
+            document.getElementById(`q${question}${option}-false`).checked = false;
+        } else {
+            document.getElementById(`q${question}${option}-true`).checked = false;
+        }
+
+        // Lưu đáp án
+        if (!answers[question]) answers[question] = {};
+        answers[question][option] = value;
+    } else {
+        // Nếu bỏ chọn, xóa đáp án
+        if (answers[question] && answers[question][option]) {
+            delete answers[question][option];
+            if (Object.keys(answers[question]).length === 0) {
+                delete answers[question];
+            }
+        }
+    }
+
+    // Đánh dấu câu hỏi đã trả lời
+    const navButton = document.getElementById(`nav-q${question}`);
+    if (navButton && answers[question] && Object.keys(answers[question]).length > 0) {
+        navButton.classList.add('answered');
+    } else if (navButton) {
+        navButton.classList.remove('answered');
+    }
+
+    // Cập nhật thanh tiến trình
+    updateProgressBar();
+}
+
+// Cập nhật thanh tiến trình
+function updateProgressBar() {
+    const answeredCount = Object.keys(answers).length;
+    const percentage = Math.round((answeredCount / totalQuestions) * 100);
+
+    const progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = `${percentage}%`;
+    progressBar.setAttribute('aria-valuenow', percentage);
+    progressBar.textContent = `${percentage}%`;
+}
+
+// Điều hướng đến câu hỏi cụ thể
+function goToQuestion(question) {
+    // Xóa lớp active khỏi tất cả câu hỏi
+    document.querySelectorAll('.question').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
     });
 
-    resultDiv.innerHTML += `</tbody></table>`;
-}
+    // Xóa lớp current khỏi tất cả nút điều hướng
+    document.querySelectorAll('#question-nav button').forEach(btn => {
+        btn.classList.remove('current');
+    });
 
-function formatAnswer(answer) {
-    if (!answer) return 'Chưa trả lời';
-    if (typeof answer === 'string') return answer;
-    if (typeof answer === 'object') {
-        return Object.entries(answer)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join('<br>');
-    }
-    return JSON.stringify(answer);
-}
+    // Hiển thị câu hỏi hiện tại
+    const currentQuestionElement = document.getElementById(`q${question}`);
+    if (currentQuestionElement) {
+        currentQuestionElement.style.display = 'block';
+        currentQuestionElement.classList.add('active');
+        currentQuestion = question;
 
-function updateCountdown() {
-    const minutes = Math.floor(timeLeft / 60);
-    let seconds = timeLeft % 60;
-    seconds = seconds < 10 ? '0' + seconds : seconds;
-    document.getElementById('time').textContent = `${minutes}:${seconds}`;
-    timeLeft--;
-
-    if (timeLeft < 0) {
-        clearInterval(countdownInterval);
-        submitTest();
+        // Đánh dấu nút điều hướng hiện tại
+        const navButton = document.getElementById(`nav-q${question}`);
+        if (navButton) {
+            navButton.classList.add('current');
+        }
     }
 }
 
-const countdownInterval = setInterval(updateCountdown, 1000);
-
-// Thêm event listener cho việc chọn môn học
-document.getElementById('subject-select').addEventListener('change', function(e) {
-    if (confirm('Thay đổi môn học sẽ xóa tất cả câu trả lời hiện tại. Bạn có chắc chắn muốn tiếp tục?')) {
-        currentSubject = e.target.value;
-        localStorage.clear(); // Xóa các câu trả lời đã lưu
-        answeredQuestions.clear();
-        timeLeft = subjectConfig[currentSubject].time * 60; // Cập nhật thời gian
-        createQuestions();
-        renderQuestions();
-    } else {
-        e.target.value = currentSubject; // Khôi phục lại giá trị cũ
+// Chuyển đến câu hỏi trước
+function prevQuestion() {
+    if (currentQuestion > 1) {
+        goToQuestion(currentQuestion - 1);
     }
-});
+}
 
-createQuestions();
-renderQuestions();
+// Chuyển đến câu hỏi tiếp theo
+function nextQuestion() {
+    if (currentQuestion < totalQuestions) {
+        goToQuestion(currentQuestion + 1);
+    }
+}
+
+// Tính điểm khi hoàn thành
+function submitAnswers() {
+    // Kiểm tra xem đã tải file đáp án chưa
+    if (Object.keys(correctAnswers).length === 0) {
+        alert('Vui lòng tải lên file JSON chứa đáp án hoặc nhập đáp án vào ô text trước khi chấm điểm!');
+        return;
+    }
+
+    // Reset điểm số
+    score = {
+        multipleChoice: 0,
+        trueFalse: 0,
+        shortAnswer: 0,
+        total: 0
+    };
+    correctCount = 0;
+    incorrectCount = 0;
+    unansweredCount = 0;
+
+    const multipleChoiceCount = subject === 'math' ? 12 : 18;
+    const trueFalseCount = 4;
+
+    // Tính điểm trắc nghiệm
+    for (let i = 1; i <= multipleChoiceCount; i++) {
+        const resultDiv = document.getElementById(`result-q${i}`);
+        if (answers[i] === correctAnswers[i.toString()]) {
+            score.multipleChoice += 0.25;
+            correctCount++;
+            resultDiv.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Đúng';
+            resultDiv.className = 'result mt-2 text-success';
+        } else if (answers[i] === undefined) {
+            unansweredCount++;
+            resultDiv.innerHTML = '<i class="bi bi-dash-circle-fill text-secondary"></i> Chưa trả lời';
+            resultDiv.className = 'result mt-2 text-secondary';
+        } else {
+            incorrectCount++;
+            resultDiv.innerHTML = `<i class="bi bi-x-circle-fill text-danger"></i> Sai (Đáp án đúng: ${correctAnswers[i.toString()]})`;
+            resultDiv.className = 'result mt-2 text-danger';
+        }
+    }
+
+    // Tính điểm đúng/sai
+    for (let i = multipleChoiceCount + 1; i <= multipleChoiceCount + trueFalseCount; i++) {
+        const resultDiv = document.getElementById(`result-q${i}`);
+        let correctSubCount = 0;
+        const userAnswer = answers[i] || {};
+        const correctAnswer = correctAnswers[i.toString()];
+
+        if (correctAnswer) {
+            let resultHTML = '<ul class="list-group list-group-flush mt-2">';
+
+            ['a', 'b', 'c', 'd'].forEach(option => {
+                if (userAnswer[option] === correctAnswer[option]) {
+                    correctSubCount++;
+                    resultHTML += `<li class="list-group-item text-success"><i class="bi bi-check-circle-fill"></i> ${option.toUpperCase()}: ${correctAnswer[option]}</li>`;
+                } else if (userAnswer[option] === undefined) {
+                    resultHTML += `<li class="list-group-item text-secondary"><i class="bi bi-dash-circle-fill"></i> ${option.toUpperCase()}: Chưa trả lời (Đáp án: ${correctAnswer[option]})</li>`;
+                } else {
+                    resultHTML += `<li class="list-group-item text-danger"><i class="bi bi-x-circle-fill"></i> ${option.toUpperCase()}: ${userAnswer[option]} (Đáp án: ${correctAnswer[option]})</li>`;
+                }
+            });
+
+            resultHTML += '</ul>';
+
+            // Tính điểm theo số ý đúng
+            let pointsEarned = 0;
+            if (correctSubCount === 1) pointsEarned = 0.1;
+            else if (correctSubCount === 2) pointsEarned = 0.25;
+            else if (correctSubCount === 3) pointsEarned = 0.5;
+            else if (correctSubCount === 4) pointsEarned = 1;
+
+            score.trueFalse += pointsEarned;
+
+            // Hiển thị kết quả
+            resultDiv.innerHTML = `<div class="alert ${correctSubCount > 0 ? 'alert-success' : 'alert-danger'}">
+                Đúng ${correctSubCount}/4 ý (${pointsEarned} điểm)
+                ${resultHTML}
+            </div>`;
+
+            if (correctSubCount > 0) {
+                correctCount++;
+            } else if (Object.keys(userAnswer).length === 0) {
+                unansweredCount++;
+            } else {
+                incorrectCount++;
+            }
+        }
+    }
+
+    // Tính điểm trả lời ngắn
+    const shortAnswerPoints = subject === 'math' ? 0.5 : 0.25;
+    for (let i = multipleChoiceCount + trueFalseCount + 1; i <= totalQuestions; i++) {
+        const resultDiv = document.getElementById(`result-q${i}`);
+        const userAnswer = (answers[i] || '').trim();
+        const correctAnswer = correctAnswers[i.toString()];
+
+        if (userAnswer === correctAnswer) {
+            score.shortAnswer += shortAnswerPoints;
+            correctCount++;
+            resultDiv.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Đúng';
+            resultDiv.className = 'result mt-2 text-success';
+        } else if (userAnswer === '') {
+            unansweredCount++;
+            resultDiv.innerHTML = '<i class="bi bi-dash-circle-fill text-secondary"></i> Chưa trả lời';
+            resultDiv.className = 'result mt-2 text-secondary';
+        } else {
+            incorrectCount++;
+            resultDiv.innerHTML = `<i class="bi bi-x-circle-fill text-danger"></i> Sai (Đáp án đúng: ${correctAnswer})`;
+            resultDiv.className = 'result mt-2 text-danger';
+        }
+    }
+
+    // Tính tổng điểm
+    score.total = score.multipleChoice + score.trueFalse + score.shortAnswer;
+
+    // Hiển thị kết quả trong modal
+    document.getElementById('final-score').textContent = score.total.toFixed(2);
+    document.getElementById('correct-count').textContent = correctCount;
+    document.getElementById('incorrect-count').textContent = incorrectCount;
+    document.getElementById('unanswered-count').textContent = unansweredCount;
+
+    document.getElementById('mc-score').textContent = score.multipleChoice.toFixed(2);
+    document.getElementById('mc-max').textContent = maxScore.multipleChoice.toFixed(2);
+
+    document.getElementById('tf-score').textContent = score.trueFalse.toFixed(2);
+    document.getElementById('tf-max').textContent = maxScore.trueFalse.toFixed(2);
+
+    document.getElementById('sa-score').textContent = score.shortAnswer.toFixed(2);
+    document.getElementById('sa-max').textContent = maxScore.shortAnswer.toFixed(2);
+
+    document.getElementById('total-score').textContent = score.total.toFixed(2);
+    document.getElementById('total-max').textContent = maxScore.total.toFixed(2);
+
+    // Tạo chi tiết kết quả câu hỏi
+    displayQuestionResultsDetail();
+
+    // Hiển thị modal kết quả
+    resultModal.show();
+}
+
+function displayQuestionResultsDetail() {
+    const questionResultsDetailDiv = document.getElementById('question-results-detail');
+    questionResultsDetailDiv.innerHTML = ''; // Clear previous results
+
+    const multipleChoiceCount = subject === 'math' ? 12 : 18;
+    const trueFalseCount = 4;
+
+    // Kết quả trắc nghiệm
+    for (let i = 1; i <= multipleChoiceCount; i++) {
+        const questionDiv = document.createElement('div');
+        questionDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'question-result-item');
+        let resultIcon = '';
+        let resultText = '';
+        let resultClass = '';
+        let questionContent = '';
+
+        questionContent = `<p class="fw-bold">Câu ${i}: Câu hỏi trắc nghiệm ${i}?</p>`;
+
+
+        if (answers[i] === correctAnswers[i.toString()]) {
+            resultIcon = '<i class="bi bi-check-circle-fill text-success me-2"></i>';
+            resultText = `Đúng - Bạn đã chọn ${answers[i]}`;
+            resultClass = 'border-success';
+        } else if (answers[i] === undefined) {
+            resultIcon = '<i class="bi bi-dash-circle-fill text-secondary me-2"></i>';
+            resultText = 'Chưa trả lời';
+            resultClass = 'border-secondary';
+        } else {
+            resultIcon = '<i class="bi bi-x-circle-fill text-danger me-2"></i>';
+            resultText = `Sai - Bạn đã chọn ${answers[i]}, đáp án đúng là ${correctAnswers[i.toString()]}`;
+            resultClass = 'border-danger';
+        }
+
+        questionDiv.innerHTML = `<div class="${resultClass}"><h6 class="d-flex align-items-center">${resultIcon} ${resultText}</h6>${questionContent}</div>`;
+        questionResultsDetailDiv.appendChild(questionDiv);
+    }
+
+    // Kết quả đúng/sai
+    for (let i = multipleChoiceCount + 1; i <= multipleChoiceCount + trueFalseCount; i++) {
+        const questionDiv = document.createElement('div');
+        questionDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'question-result-item');
+        let resultIcon = '<i class="bi bi-exclamation-circle-fill text-warning me-2"></i>';
+        let resultText = 'Đúng/Sai - Kết quả chi tiết:';
+        let resultClass = 'border-warning';
+        let detailList = '<ul class="list-unstyled">';
+        let hasCorrect = false;
+        let hasIncorrect = false;
+        let hasUnanswered = false;
+        const userAnswer = answers[i] || {};
+        const correctAnswer = correctAnswers[i.toString()];
+        let questionContent = `<p class="fw-bold">Câu ${i}: Câu hỏi đúng/sai ${i - multipleChoiceCount}?</p>`;
+
+
+        if (correctAnswer) {
+            ['a', 'b', 'c', 'd'].forEach(option => {
+                let optionResult = '';
+                let optionIcon = '';
+                if (userAnswer[option] === correctAnswer[option]) {
+                    optionIcon = '<i class="bi bi-check-circle-fill text-success me-2"></i>';
+                    optionResult = `<li class="text-success d-flex align-items-center">${optionIcon} ${option.toUpperCase()}: Đúng</li>`;
+                    hasCorrect = true;
+                } else if (userAnswer[option] === undefined) {
+                    optionIcon = '<i class="bi bi-dash-circle-fill text-secondary me-2"></i>';
+                    optionResult = `<li class="text-secondary d-flex align-items-center">${optionIcon} ${option.toUpperCase()}: Chưa trả lời (Đáp án: ${correctAnswer[option]})</li>`;
+                    hasUnanswered = true;
+                } else {
+                    optionIcon = '<i class="bi bi-x-circle-fill text-danger me-2"></i>';
+                    optionResult = `<li class="text-danger d-flex align-items-center">${optionIcon} ${option.toUpperCase()}: Sai - Bạn chọn ${userAnswer[option]} (Đáp án: ${correctAnswer[option]})</li>`;
+                    hasIncorrect = true;
+                }
+                detailList += optionResult;
+            });
+        }
+        detailList += '</ul>';
+
+        if (hasCorrect && !hasIncorrect && !hasUnanswered) {
+            resultClass = 'border-success';
+        } else if (hasIncorrect) {
+            resultClass = 'border-danger';
+        } else if (hasUnanswered) {
+            resultClass = 'border-secondary';
+        }
+
+        questionDiv.innerHTML = `<div class="${resultClass}"><h6 class="d-flex align-items-center">${resultIcon} ${resultText}</h6>${questionContent}${detailList}</div>`;
+        questionResultsDetailDiv.appendChild(questionDiv);
+    }
+
+    // Kết quả trả lời ngắn
+    const shortAnswerPoints = subject === 'math' ? 0.5 : 0.25;
+    for (let i = multipleChoiceCount + trueFalseCount + 1; i <= totalQuestions; i++) {
+        const questionDiv = document.createElement('div');
+        questionDiv.classList.add('mb-3', 'p-3', 'border', 'rounded', 'question-result-item');
+        let userAnswer = (answers[i] || '').trim();
+        let correctAnswer = correctAnswers[i.toString()];
+        let resultIcon = '';
+        let resultText = '';
+        let resultClass = '';
+        let questionContent = `<p class="fw-bold">Câu ${i}: Câu hỏi trả lời ngắn ${i - multipleChoiceCount - trueFalseCount}?</p>`;
+
+
+        if (userAnswer === correctAnswer) {
+            resultIcon = '<i class="bi bi-check-circle-fill text-success me-2"></i>';
+            resultText = `Đúng - Đáp án của bạn: ${userAnswer}`;
+            resultClass = 'border-success';
+        } else if (userAnswer === '') {
+            resultIcon = '<i class="bi bi-dash-circle-fill text-secondary me-2"></i>';
+            resultText = 'Chưa trả lời';
+            resultClass = 'border-secondary';
+        } else {
+            resultIcon = '<i class="bi bi-x-circle-fill text-danger me-2"></i>';
+            resultText = `Sai - Đáp án của bạn: ${userAnswer}, đáp án đúng là ${correctAnswer}`;
+            resultClass = 'border-danger';
+        }
+
+        questionDiv.innerHTML = `<div class="${resultClass}"><h6 class="d-flex align-items-center">${resultIcon} ${resultText}</h6>${questionContent}</div>`;
+        questionResultsDetailDiv.appendChild(questionDiv);
+    }
+}

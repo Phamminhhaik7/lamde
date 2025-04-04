@@ -1,0 +1,100 @@
+body {
+    background-color: #f8f9fa;
+    padding-bottom: 50px;
+}
+
+.card {
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.timer {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #dc3545;
+}
+
+.section-header {
+    background-color: #007bff;
+    color: white;
+    padding: 12px 15px;
+    border-radius: 10px 10px 0 0;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.question {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.3s;
+}
+
+.question:last-child {
+    border-bottom: none;
+}
+
+.question:hover {
+    background-color: #f8f9fa;
+}
+
+.question.active {
+    background-color: #e9f5ff;
+    border-left: 4px solid #007bff;
+}
+
+.result {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+#question-nav button {
+    min-width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 3px;
+}
+
+#question-nav button.answered {
+    background-color: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+#question-nav button.current {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+    transform: scale(1.1);
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.form-check {
+    margin-bottom: 8px;
+}
+
+.form-check-input:checked {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.checkbox-item {
+    flex: 1 0 45%;
+    min-width: 150px;
+}
+
+@media (max-width: 768px) {
+    .checkbox-item {
+        flex: 1 0 100%;
+    }
+}
